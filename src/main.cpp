@@ -121,7 +121,7 @@ void setup() {
     esp_now_register_recv_cb(OnDataRecv);
     esp_now_register_send_cb(OnDataSent);
 
-    handleScanTask(preferences.getBool("scanIsActive", false));
+    handleScanTask(preferences.getBool("scanIsActive", true));
     handleAlarm(preferences.getBool("alarmIsActive", false));
 
     Serial.println(WiFi.macAddress());
