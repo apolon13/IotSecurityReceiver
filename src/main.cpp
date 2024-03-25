@@ -40,13 +40,9 @@ void scanSensorsTask(void *) {
 }
 
 void handleScanTask(bool activateScan) {
-    Serial.print("Scan status - ");
-    Serial.println(to_string(activateScan).c_str());
-
     if (activateScan) {
         ioTRadioSignal->enable();
         if (handler == nullptr) {
-            Serial.println("Create scan task");
             xTaskCreate(
                     scanSensorsTask,
                     "scanSensorsTask",
@@ -56,13 +52,11 @@ void handleScanTask(bool activateScan) {
                     &handler
             );
         } else {
-            Serial.println("Resume scan task");
             vTaskResume(handler);
         }
     }
 
     if (!activateScan && handler != nullptr) {
-        Serial.println("Suspend scan task");
         ioTRadioSignal->disable();
         vTaskSuspend(handler);
     }
@@ -71,24 +65,18 @@ void handleScanTask(bool activateScan) {
 }
 
 void handleAlarm(bool alarm) {
-    Serial.print("Alarm status - ");
-    Serial.println(to_string(alarm).c_str());
-    SirenMessage sirenMessage = {alarm};
-    esp_now_send(sirenMacAddress, (uint8_t *) &sirenMessage, sizeof(sirenMessage));
-    preferences.putBool("alarmIsActive", alarm);
+    auto currentAlarmStatus = preferences.getBool("alarmIsActive", alarm);
+    if (currentAlarmStatus != alarm) {
+        SirenMessage sirenMessage = {alarm};
+        esp_now_send(sirenMacAddress, (uint8_t *) &sirenMessage, sizeof(sirenMessage));
+        preferences.putBool("alarmIsActive", alarm);
+    }
 }
 
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     memcpy(&msg, incomingData, sizeof(msg));
     handleScanTask(msg.activateScan);
     handleAlarm(msg.alarm);
-}
-
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-    Serial.print("\r\nLast Packet Send Status:\t");
-    Serial.printf("%02x:%02x:%02x:%02x:%02x:%02x", mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-    Serial.print("|");
-    Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
 esp_now_peer_info_t StationPeer;
@@ -119,12 +107,9 @@ void setup() {
 
     WiFi.printDiag(Serial);
     esp_now_register_recv_cb(OnDataRecv);
-    esp_now_register_send_cb(OnDataSent);
 
     handleScanTask(preferences.getBool("scanIsActive", true));
     handleAlarm(preferences.getBool("alarmIsActive", false));
-
-    Serial.println(WiFi.macAddress());
 }
 
 void loop() {
