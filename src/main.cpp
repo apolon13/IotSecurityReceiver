@@ -9,6 +9,7 @@ Preferences preferences;
 typedef struct {
     bool activateScan;
     bool alarm;
+    bool ping;
 } Message;
 
 typedef struct {
@@ -17,6 +18,7 @@ typedef struct {
 
 typedef struct {
     bool alarm;
+    bool ping;
 } SirenMessage;
 
 TaskHandle_t handler;
@@ -67,16 +69,23 @@ void handleScanTask(bool activateScan) {
 void handleAlarm(bool alarm) {
     auto currentAlarmStatus = preferences.getBool("alarmIsActive", alarm);
     if (currentAlarmStatus != alarm) {
-        SirenMessage sirenMessage = {alarm};
+        SirenMessage sirenMessage = {.alarm = currentAlarmStatus, .ping = false};
         esp_now_send(sirenMacAddress, (uint8_t *) &sirenMessage, sizeof(sirenMessage));
         preferences.putBool("alarmIsActive", alarm);
     }
+}
+
+void handlePing(bool ping) {
+    auto currentAlarmStatus = preferences.getBool("alarmIsActive", alarm);
+    SirenMessage sirenMessage = {.alarm =  currentAlarmStatus, .ping =  ping};
+    esp_now_send(sirenMacAddress, (uint8_t *) &sirenMessage, sizeof(sirenMessage));
 }
 
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     memcpy(&msg, incomingData, sizeof(msg));
     handleScanTask(msg.activateScan);
     handleAlarm(msg.alarm);
+    handlePing(msg.ping);
 }
 
 esp_now_peer_info_t StationPeer;
@@ -88,20 +97,17 @@ void setup() {
     preferences.begin("esp-receiver", false);
     WiFi.mode(WIFI_STA);
     if (esp_now_init() != ESP_OK) {
-        Serial.println("Error initializing ESP-NOW");
         return;
     }
     memcpy(StationPeer.peer_addr, stationMacAddress, 6);
     StationPeer.encrypt = false;
     if (esp_now_add_peer(&StationPeer) != ESP_OK) {
-        Serial.println("Failed to add station peer");
         return;
     }
 
     memcpy(SirenPeer.peer_addr, sirenMacAddress, 6);
     SirenPeer.encrypt = false;
     if (esp_now_add_peer(&SirenPeer) != ESP_OK) {
-        Serial.println("Failed to add siren peer");
         return;
     }
 
